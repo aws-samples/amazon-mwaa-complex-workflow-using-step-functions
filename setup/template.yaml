@@ -1,0 +1,420 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: "Resources for the Demo Movielens ETL with MWAA"
+Parameters:
+  DemoBucket:
+    Description: "The bucket used by CFN and other Demo"
+    Type: "AWS::SSM::Parameter::Value<String>"
+    Default: "/mwaa/S3/DemoBucket"
+Resources:
+  ######## IAM #########
+  # Common policy
+  LambdaCommonPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "mwaa-demo-common-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+            Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/mwaa-*"
+          - Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+            Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/mwaa/*"
+
+  # Routing Step Role
+  # Step1 Role
+  RoleLambdaExecutionStep1:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "mwaa-movielens-process"
+      ManagedPolicyArns:
+        - !Ref LambdaCommonPolicy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/state-machine/"
+      Policies:
+        - PolicyName: !Sub "mwaa-movielens-process"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource:
+              - !Sub "arn:aws:s3:::${DemoBucket}"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+              - !Sub "arn:aws:s3:::${DemoBucket}/*"
+            - Effect: Allow
+              Action:
+                - glue:GetJobRun
+                - glue:GetJobRuns
+                - glue:StartJobRun
+              Resource:
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/mwaa-*
+
+  # Step2 Role
+  RoleLambdaExecutionStep2:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub "mwaa-movielens-crawl"
+      ManagedPolicyArns:
+        - !Ref LambdaCommonPolicy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/state-machine/"
+      Policies:
+        - PolicyName: !Sub "mwaa-movielens-crawl"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - glue:StartCrawler
+              Resource:
+                - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/mwaa-movielens-*
+
+
+  # Error Handling Lambda Role
+  RoleLambdaExecutionErrorStep:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub "mwaa-movielens-error"
+      ManagedPolicyArns:
+        - !Ref LambdaCommonPolicy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/state-machine/"
+      Policies:
+        - PolicyName: !Sub "mwaa-movielens-error"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - sqs:DeleteMessage
+                - sqs:DeleteMessageBatch
+                - sqs:GetQueueAttributes
+                - sqs:GetQueueUrl
+                - sqs:ListQueues
+                - sqs:ListDeadLetterSourceQueues
+                - sqs:ListQueueTags
+                - sqs:ReceiveMessage
+                - sqs:SendMessage
+                - sqs:SendMessageBatch
+              Resource:
+              - !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:mwaa-*"
+
+  StatesExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "mwaa-states-execution"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - !Sub "states.${AWS::Region}.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: !Sub "mwaa-movielens-states-execution"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "lambda:InvokeFunction"
+                Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:mwaa-*"
+              - Effect: Allow
+                Action:
+                    - "states:DescribeExecution"
+                    - "states:StopExecution"
+                Resource: "*"
+
+  ######## LAMBDA FUNCTIONS #########
+  LambdaStep1:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.6
+      CodeUri: ./lambda/process-data/src
+      FunctionName: "mwaa-process-movielens"
+      Description: "Process movielens data to create aggregated dataset"
+      MemorySize: 1536
+      Timeout: 900
+      Role: !GetAtt RoleLambdaExecutionStep1.Arn
+
+  LambdaJobCheckStep:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.6
+      CodeUri: ./lambda/check-job/src
+      FunctionName: "mwaa-checkjob-movielens"
+      Description: "Checks if job has finished (success/failure)"
+      MemorySize: 256
+      Timeout: 300
+      Role: !GetAtt RoleLambdaExecutionStep1.Arn
+
+  LambdaStep2:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.6
+      CodeUri: ./lambda/crawl-data/src
+      FunctionName: "mwaa-crawl-movielens"
+      Description: "Glue crawler"
+      MemorySize: 512
+      Timeout: 300
+      Role: !GetAtt RoleLambdaExecutionStep2.Arn
+
+  LambdaErrorStep:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.6
+      CodeUri: ./lambda/process-error/src
+      FunctionName: "mwaa-movielens-error"
+      Description: "Fallback lambda to handle messages which failed processing"
+      MemorySize: 256
+      Timeout: 300
+      Role: !GetAtt RoleLambdaExecutionErrorStep.Arn
+
+  StateMachine:
+    Type: "AWS::StepFunctions::StateMachine"
+    Properties:
+      StateMachineName: "Movielens-Transform-job"
+      DefinitionString:
+        !Sub
+          - |-
+            {
+              "Comment": "Movie Lens Transformation Flow",
+              "StartAt": "Try",
+              "States": {
+                "Try": {
+                  "Type": "Parallel",
+                  "Branches": [
+                    {
+                      "StartAt": "Process Data",
+                      "States":{
+                        "Process Data": {
+                          "Type": "Task",
+                          "Resource": "${lStep1}",
+                          "Comment": "Process Movie Lens Data",
+                          "ResultPath": "$.body.job",
+                          "Next": "Wait"
+                        },
+                        "Wait": {
+                            "Type": "Wait",
+                            "Seconds": 15,
+                            "Next": "Get Job status"
+                        },
+                        "Get Job status": {
+                            "Type": "Task",
+                            "Resource": "${lCheckJob}",
+                            "ResultPath": "$.body.job",
+                            "Next": "Did Job finish?"
+                        },
+                        "Did Job finish?": {
+                            "Type": "Choice",
+                            "Choices": [{
+                                "Variable": "$.body.job.jobDetails.jobStatus",
+                                "StringEquals": "SUCCEEDED",
+                                "Next": "Run Glue Crawler"
+                            },{
+                                "Variable": "$.body.job.jobDetails.jobStatus",
+                                "StringEquals": "FAILED",
+                                "Next": "Job Failed"
+                            }],
+                            "Default": "Wait"
+                        },
+                          "Job Failed": {
+                          "Type": "Fail",
+                          "Error": "Job Failed",
+                          "Cause": "Job failed, please check the logs"
+                        },
+                        "Run Glue Crawler": {
+                          "Type": "Task",
+                          "Resource": "${lStep2}",
+                          "Comment": "Run Glue Crawler",
+                          "ResultPath": "$.statusCode",
+                          "End": true
+                        }
+                      }
+                    }
+                  ],
+                  "Catch": [
+                    {
+                      "ErrorEquals": [ "States.ALL" ],
+                      "ResultPath": null,
+                      "Next": "Error"
+                    }
+                  ],
+                  "Next": "Done"
+                },
+                "Done": {
+                  "Type": "Succeed"
+                },
+                "Error": {
+                  "Type": "Task",
+                  "Resource": "${lError}",
+                  "Comment": "Handling Error",
+                  "Next": "Failed"
+                },
+                "Failed": {
+                  "Type": "Fail"
+                }
+              }
+            }
+          - {
+              lStep1: !GetAtt LambdaStep1.Arn,
+              lStep2: !GetAtt LambdaStep2.Arn,
+              lCheckJob: !GetAtt LambdaJobCheckStep.Arn,
+              lError: !GetAtt LambdaErrorStep.Arn
+            }
+      RoleArn: !GetAtt StatesExecutionRole.Arn
+
+
+######################################################################
+  DemoCrawlerRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/service-role/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "glue.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
+      Policies:
+        - PolicyName: "mwaa-glue-crawler"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:ListAllMyBuckets
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                Resource: "arn:aws:s3:::aws-glue-*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - "arn:aws:s3:::aws-glue-*/*"
+                  - "arn:aws:s3:::*/*aws-glue-*/*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - "arn:aws:s3:::crawler-public*"
+                  - "arn:aws:s3:::aws-glue-*"
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  - !Sub "arn:aws:s3:::${DemoBucket}/*"
+
+
+  ######## GLUE #########
+  GlueDataCatalog:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Description: "MovieLens Database"
+        Name: "mwaa-movielens-demo-db"
+
+  GlueCrawlerMovie:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Role: !GetAtt DemoCrawlerRole.Arn
+      DatabaseName: !Ref GlueDataCatalog
+      Name: "mwaa-movielens-curated-crawler-popular-movies"
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${DemoBucket}/curated/most_popular_movies"
+
+  GlueCrawlerRating:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Role: !GetAtt DemoCrawlerRole.Arn
+      DatabaseName: !Ref GlueDataCatalog
+      Name: "mwaa-movielens-curated-crawler-toprated-movies"
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${DemoBucket}/curated/top_rated_movies"
+  DemoGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${DemoBucket}/scripts/glue_jobs/movielens/movielens_glue_transform.py'
+      Description: 'Perform aggregation on movie lens data'
+      ExecutionProperty:
+        MaxConcurrentRuns: 3
+      GlueVersion: '2.0'
+      MaxRetries: 0
+      MaxCapacity: 1
+      Name: mwaa-movielens-glue-job
+      Role: !Ref DemoCrawlerRole
+  ######## SSM OUTPUTS #########
+  StateMachineSsm:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: "/mwaa/sfn/movielens"
+      Type: "String"
+      Value: !Ref StateMachine
+      Description: !Sub "ARN of the Movie Lens State Machine"
+
+  GlueJobSsm:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: "/mwaa/glue/movielens"
+      Type: "String"
+      Value: !Ref DemoGlueJob
+      Description: !Sub "Glue Jog Name"

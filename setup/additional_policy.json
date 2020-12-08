@@ -1,0 +1,31 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "states:DescribeStateMachineForExecution",
+                "states:DescribeStateMachine",
+                "states:DescribeExecution",
+                "states:StartExecution",
+                "elasticmapreduce:*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole",
+                "ssm:GetParameters",
+                "ssm:GetParameter"
+            ],
+            "Resource": [
+                "arn:aws:iam::<AccountNo>:role/EMR_DefaultRole",
+                "arn:aws:iam::<AccountNo>:role/EMR_EC2_DefaultRole",
+                "arn:aws:ssm:*:<AccountNo>:parameter/mwaa/*"
+            ]
+        }
+    ]
+}
