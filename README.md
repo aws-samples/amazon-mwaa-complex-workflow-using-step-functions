@@ -79,12 +79,13 @@ Important: this application uses various AWS services and there are costs associ
 ## AWS resources :
 Following stacks are created by the above process
 1. ```mwaa-demo-foundations``` - Contains the foundational resources and services 
-    Glue Database - mwaa-movielens-demo-db
+    ```Glue Database - mwaa-movielens-demo-db
     Glue Crawlers  - Crawlers to catalog the data.
     Lambda Functions - To invoke Glue jobs and check status from Step Functions  
-    LambdaRole - Lambda role for Routing Lambda
+    LambdaRole - Lambda role for Step1 and Step2
     SSM Parameters -  SSM parameters for resources to be used by all services.
-    Step Functions -  Data Curate Step function
+    Step Functions -  Movie Lens Step function
+   ```
 
 
 ## AWS resources created based on DAG Run:
