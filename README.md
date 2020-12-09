@@ -60,6 +60,16 @@ Important: this application uses various AWS services and there are costs associ
    
    Modify the stack-name or bucket parameters as needed. Wait for the stack to complete.
 
+4. Wait for the script to complete. You should see the following logs.
+    ```
+    Waiting for stack update to complete ...
+    Finished create/update successfully!
+    upload: ./movielens_glue_transform.py to s3://mwaa-dl-demo-us-east-1/scripts/glue_jobs/movielens/movielens_glue_transform.py
+    upload: transform/preprocess_movies.py to s3://mwaa-dl-demo-us-east-1/scripts/preprocess_movies.py
+    upload: transform/preprocess_tags.py to s3://mwaa-dl-demo-us-east-1/scripts/preprocess_tags.py
+    upload: transform/preprocess_ratings.py to s3://mwaa-dl-demo-us-east-1/scripts/preprocess_ratings.py
+    ...
+    ```
 
 ## Post Installation Checks
 1. Verify the resources created by the Cloudformation template.
