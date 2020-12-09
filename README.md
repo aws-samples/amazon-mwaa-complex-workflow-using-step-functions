@@ -34,13 +34,13 @@ Important: this application uses various AWS services and there are costs associ
         ssm:GetParameter
 
  
- A sample [Policy](./setup/additional_policy.json) is provided as an example. Verify and edit the Account Number to your AWS Account Number.
+ A sample [Policy](setup/additional_policy.json) is provided as an example. Verify and edit the Account Number to your AWS Account Number.
  Create and Attach the Policy to the Amazon MWAA execution role. 
  
  Refer to this [link](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_manage-attach-detach.html) for Adding and removing IAM identity permissions.
  
  A sample role yaml is also provided if you do not have EMR_DEFAULT_ROLE and EMR_EC2_ROLE already created. 
- Run the Cloudformation template to create [EMR Roles](./setup/default-emr-roles.yaml)
+ Run the Cloudformation template to create [EMR Roles](setup/default-emr-roles.yaml)
  
  
 
@@ -73,7 +73,8 @@ Important: this application uses various AWS services and there are costs associ
 
 ## Post Installation Checks
 1. Verify the resources created by the Cloudformation template.
-2. The deploy script creates a Glue Database and 2 crawlers. If you have [Lakeformation](https://aws.amazon.com/lake-formation/) enabled, please make sure to add the LF database grant to the crawler.
+2. Verify that Amazon MWAA execution role has [additional policy](setup/additional_policy.json) attached.
+3. The deploy script creates a Glue Database and 2 crawlers. If you have [Lakeformation](https://aws.amazon.com/lake-formation/) enabled, please make sure to add the LF database grant to the crawler.
 
 ## AWS resources :
 Following stacks are created by the above process
