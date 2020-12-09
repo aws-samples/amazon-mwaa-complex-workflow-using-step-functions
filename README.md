@@ -21,19 +21,27 @@ Important: this application uses various AWS services and there are costs associ
 ## Prerequisites
 1.  AWS Account .[Create an AWS account](https://portal.aws.amazon.com/gp/aws/developer/registration/index.html) if you do not already have one and login.
 2.  Amazon Managed Workflow for Apache Airflow environment in supported region.[Create environment](https://us-west-2.console.aws.amazon.com/mwaa/home?region=us-west-2#/create/environment) if you do not have one. Note us-west-2 is selected. Change the region, if required.
-3.  IAM permissions for the MWAA Execution role for S3 access
+3.  IAM permissions for the MWAA Execution role for S3 ,EMR, Step Functions and AWS Systems Manager Parameter Store.
 
         elasticmapreduce:RunJobFlow
         iam:PassRole on EMR_DEFAULT_ROLE
         iam:PassRole on EMR_EC2_ROLE
-        "states:DescribeStateMachineForExecution",
-        "states:DescribeStateMachine",
-        "states:DescribeExecution",
-        "states:StartExecution",
-        "elasticmapreduce:*"
+        states:DescribeStateMachineForExecution
+        states:DescribeStateMachine
+        states:DescribeExecution
+        states:StartExecution
+        ssm:GetParameters
+        ssm:GetParameter
+
  
- A sample policy is provided as an example. [Policy](setup/additional_policy.json)
- A sample role yaml is also provided if you do not have EMR_DEFAULT_ROLE and EMR_EC2_ROLE already created. [EMR Roles](setup/default-emr-roles.yaml)
+ A sample [Policy](./setup/additional_policy.json) is provided as an example. Verify and edit the Account Number to your AWS Account Number.
+ Create and Attach the Policy to the Amazon MWAA execution role. 
+ 
+ Refer to this [link](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_manage-attach-detach.html) for Adding and removing IAM identity permissions.
+ 
+ A sample role yaml is also provided if you do not have EMR_DEFAULT_ROLE and EMR_EC2_ROLE already created. 
+ Run the Cloudformation template to create [EMR Roles](./setup/default-emr-roles.yaml)
+ 
  
 
 ## Installation Instructions
@@ -43,10 +51,19 @@ Important: this application uses various AWS services and there are costs associ
 3. From the command line, change directory into the ```setup``` folder, then run:
     ```
     ./deploy.sh -s <MWAA Airflow Dag Bucket Name> -d <Demo Data Bucket Name>
-    ./deploy.sh -s airflow-dipankar-us-east-1 -d mwaa-dl-demo-us-east-1
+
     ```
+   
+   Replace `<MWAA Airflow Dag Bucket Name> ` with the MWAA Airflow S3 Bucket
+   
+   Replace `<Demo Data Bucket Name> ` with any existing bucket you want to use with or a new bucket. The script will create a bucket if it does not exist.
+   
    Modify the stack-name or bucket parameters as needed. Wait for the stack to complete.
 
+
+## Post Installation Checks
+1. Verify the resources created by the Cloudformation template.
+2. The deploy script creates a Glue Database and 2 crawlers. If you have [Lakeformation](https://aws.amazon.com/lake-formation/) enabled, please make sure to add the LF database grant to the crawler.
 
 ## AWS resources :
 Following stacks are created by the above process
