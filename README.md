@@ -18,6 +18,10 @@ Important: this application uses various AWS services and there are costs associ
 
 * AWS CLI already configured with Administrator permission
 
+## Architecture
+
+![Architecture](images/architecture.png)
+
 ## Prerequisites
 1.  AWS Account .[Create an AWS account](https://portal.aws.amazon.com/gp/aws/developer/registration/index.html) if you do not already have one and login.
 2.  Amazon Managed Workflow for Apache Airflow environment in supported region.[Create environment](https://us-west-2.console.aws.amazon.com/mwaa/home?region=us-west-2#/create/environment) if you do not have one. Note us-west-2 is selected. Change the region, if required.
