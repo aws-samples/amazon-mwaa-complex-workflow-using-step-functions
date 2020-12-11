@@ -41,16 +41,8 @@ then
 fi
 echo "Checking if bucket exists ..."
 if ! aws s3 ls $S3_BUCKET --profile $PROFILE; then
-  echo "S3 bucket named $S3_BUCKET does not exist. Create? [Y/N]"
-  read choice
-  if [ $choice == "Y" ] || [ $choice == "y" ]; then
-    echo $PROFILE
-    aws s3 mb s3://$S3_BUCKET --profile $PROFILE
-
-  else
-    echo "Bucket does not exist. Deploy aborted."
-    exit 1
-  fi
+  echo "S3 bucket named $S3_BUCKET does not exist. Please verify and run the script again."
+  exit 1
 fi
 
 #Adding the DemoBucket to SSM Parameter
