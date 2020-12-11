@@ -355,7 +355,10 @@ Resources:
                   - "arn:aws:s3:::aws-glue-*"
               - Effect: Allow
                 Action:
-                  - s3:*
+                  - s3:Get*
+                  - s3:GetBucketVersioning
+                  - s3:List*
+                  - s3:PutObject*
                 Resource:
                   - !Sub "arn:aws:s3:::${DemoBucket}/*"
 
