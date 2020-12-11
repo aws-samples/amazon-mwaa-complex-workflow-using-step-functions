@@ -61,7 +61,7 @@ Important: this application uses various AWS services and there are costs associ
    
    Replace `<MWAA Airflow Dag Bucket Name> ` with the MWAA Airflow S3 Bucket
    
-   Replace `<Demo Data Bucket Name> ` with any existing bucket you want to use with or a new bucket. The script will create a bucket if it does not exist.
+   Replace `<Demo Data Bucket Name> ` with any bucket you want to use.
    
    Modify the stack-name or bucket parameters as needed. Wait for the stack to complete.
 
