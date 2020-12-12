@@ -12,7 +12,6 @@ Resources:
   LambdaCommonPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: !Sub "mwaa-demo-common-policy"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -36,7 +35,6 @@ Resources:
   RoleLambdaExecutionStep1:
     Type: "AWS::IAM::Role"
     Properties:
-      RoleName: "mwaa-movielens-process"
       ManagedPolicyArns:
         - !Ref LambdaCommonPolicy
       AssumeRolePolicyDocument:
@@ -75,7 +73,6 @@ Resources:
   RoleLambdaExecutionStep2:
     Type: "AWS::IAM::Role"
     Properties:
-      RoleName: !Sub "mwaa-movielens-crawl"
       ManagedPolicyArns:
         - !Ref LambdaCommonPolicy
       AssumeRolePolicyDocument:
@@ -102,7 +99,6 @@ Resources:
   RoleLambdaExecutionErrorStep:
     Type: "AWS::IAM::Role"
     Properties:
-      RoleName: !Sub "mwaa-movielens-error"
       ManagedPolicyArns:
         - !Ref LambdaCommonPolicy
       AssumeRolePolicyDocument:
@@ -136,7 +132,6 @@ Resources:
   StatesExecutionRole:
     Type: "AWS::IAM::Role"
     Properties:
-      RoleName: "mwaa-states-execution"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -159,7 +154,7 @@ Resources:
                 Action:
                     - "states:DescribeExecution"
                     - "states:StopExecution"
-                Resource: "*"
+                Resource: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:Movielens-Transform-job"
 
   ######## LAMBDA FUNCTIONS #########
   LambdaStep1:
@@ -333,8 +328,8 @@ Resources:
                 Action:
                   - s3:GetBucketLocation
                   - s3:ListBucket
-                  - s3:ListAllMyBuckets
-                Resource: "*"
+                Resource:
+                  - !Sub "arn:aws:s3:::${DemoBucket}"
               - Effect: Allow
                 Action:
                   - s3:CreateBucket
